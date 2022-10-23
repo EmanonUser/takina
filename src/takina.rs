@@ -18,29 +18,27 @@ impl Record {
         rrset_ttl: u32, rrset_values: Vec<String>) -> Self {
 
             for c in rrset_name.chars() {
-                if c.is_ascii_alphanumeric() == false {
+                if !c.is_ascii_alphanumeric() {
                     panic!("Record name does not match ascii_alphanumeric pattern")
                 }
             }
 
             let rrset_type = rrset_type.to_uppercase();
-            if rrset_type != "AAAA" {
-                if rrset_type != "A" {
-                    panic!("Record type is neither A or AAAA")
-                }
+
+            if rrset_type != "AAAA" && rrset_type != "A" {
+                panic!("Record type is neither A or AAAA") 
             }
 
             if rrset_ttl > 2_592_000 {
                 panic!("TTL size exceed gandis's maximum value (2_592_000)")
             }
 
-            let record = Record {
+            Record {
                 rrset_name,
                 rrset_type,
                 rrset_ttl,
                 rrset_values,
-            };
-            record
+            }  
         }
     
     pub fn diff(&self, record: &Self) -> RecordState {

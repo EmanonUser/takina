@@ -34,7 +34,7 @@ fn main() {
 
     for record in &records {
 
-        let gandi_query = match get_record(&api_key, &record) {
+        let gandi_query = match get_record(&api_key, record) {
             Ok(r) => r,
             Err(e) => {
                 println!("Network error: Unable to connect to gandi's API");
@@ -57,7 +57,7 @@ fn main() {
             }
             StatusCode::NOT_FOUND => {
                 println!("API HTTP Error: NOT_FOUND record does not exist or bad url");
-                match create_record(&api_key, &record) {
+                match create_record(&api_key, record) {
                     Ok(_) => {
                         println!("Info: Sucessfull creation for {}.{} type {}", record.get_name(), takina::DOMAIN_NAME, record.get_type());
                         println!("Info: New address(es) {:?}", record.get_values());
@@ -81,9 +81,9 @@ fn main() {
         let res = query.text().expect("Parsing Error: Failed to process API response");
         let res: takina::Record = serde_json::from_str(&res).expect("Serde Error: Failed to Serialize API response");
 
-        let status = match res.diff(&record) {
+        let status = match res.diff(record) {
             takina::RecordState::Diff => {
-                update_record(&api_key, &record)
+                update_record(&api_key, record)
             }
             takina::RecordState::Same => {
                 println!("Info: No update needed for {}.{} type {}", record.get_name(), takina::DOMAIN_NAME, record.get_type());
@@ -109,8 +109,8 @@ fn get_record(api_key: &String, record: &takina::Record) -> Result<Response, Err
     let endpoint = format!("https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}", takina::DOMAIN_NAME, record.get_name(), record.get_type());
     let client = reqwest::blocking::Client::new();
     let res = client.get(endpoint)
-        .header("Authorization", "Apikey ".to_owned() + &api_key)
-       .send()?;
+        .header("Authorization", "Apikey ".to_owned() + api_key)
+        .send()?;
     Ok(res)
 }
 
@@ -118,8 +118,8 @@ fn update_record(api_key: &String, record: &takina::Record) -> Result<Response, 
     let endpoint = format!("https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}", takina::DOMAIN_NAME, record.get_name(), record.get_type());
     let client = reqwest::blocking::Client::new();
     let res = client.put(&endpoint)
-        .header("Authorization", "Apikey ".to_owned() + &api_key)
-       .body(serde_json::to_string(&record).unwrap())
+        .header("Authorization", "Apikey ".to_owned() + api_key)
+        .body(serde_json::to_string(&record).unwrap())
         .send()?;
     Ok(res)
 }
@@ -128,7 +128,7 @@ fn create_record(api_key: &String, record: &takina::Record) -> Result<Response, 
     let endpoint = format!("https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}", takina::DOMAIN_NAME, record.get_name(), record.get_type());
     let client = reqwest::blocking::Client::new();
     let res = client.post(&endpoint)
-        .header("Authorization", "Apikey ".to_owned() + &api_key)
+        .header("Authorization", "Apikey ".to_owned() + api_key)
         .body(serde_json::to_string(&record).unwrap())
         .send()?;
     Ok(res)
@@ -136,19 +136,17 @@ fn create_record(api_key: &String, record: &takina::Record) -> Result<Response, 
 
 fn get_ipv4() -> String {
     let endpoint = "https://api.ipify.org";
-    let res = reqwest::blocking::get(endpoint)
+    reqwest::blocking::get(endpoint)
         .expect("Failed to query API")
         .text()
-        .expect("Failed to parse response");
-    res
+        .expect("Failed to parse response")
 }
 
 fn get_ipv6() -> String {
     // can return both IPv4 and IPv6 make sure an IPv6 is returned
     let endpoint = "https://api64.ipify.org";
-    let res = reqwest::blocking::get(endpoint)
+    reqwest::blocking::get(endpoint)
         .expect("Failed to query API")
         .text()
-        .expect("Failed to parse response");
-    res
+        .expect("Failed to parse response")
 }
