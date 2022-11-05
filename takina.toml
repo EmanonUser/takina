@@ -1,0 +1,18 @@
+[[domain]]
+name = "emanon.moe"
+api_key = ""
+
+  [[domain.record]]
+    name = "rust"
+    type = "A"
+    ttl = 300
+
+  [[domain.record]]
+    name = "rust"
+    type = "AAAA"
+    ttl = 300
+
+  [[domain.record]]
+    name = "test"
+    type = "AAAA"
+    ttl = 300

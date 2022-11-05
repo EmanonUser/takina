@@ -1,90 +1,92 @@
-use serde::{Deserialize, Serialize};
+use serde::{Serialize,Deserialize};
 
-pub const DOMAIN_NAME: &str = "emanon.moe";
+#[derive(Deserialize, Debug)]
+pub struct Config {
+    pub domain: Vec<Domain>
 
-#[derive(Serialize, Deserialize, Debug)]
+}
+#[derive(Deserialize, Debug)]
+pub struct Domain {
+    name: String,
+    api_key: String,
+    record: Vec<Record>
+}
+
+impl Domain {
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+
+    pub fn api_key(&self) -> &str {
+        self.api_key.as_ref()
+    }
+
+    pub fn record(&self) -> &[Record] {
+        self.record.as_ref()
+    }
+}
+
+#[derive(Deserialize, Debug)]
 pub struct Record {
+    name: String,
+    #[serde(rename = "type")]
+    rtype: String,
+    ttl: u32
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct GandiRecord {
     #[serde(skip_serializing)]
-    rrset_name: String,
+    pub rrset_name: String,
     #[serde(skip_serializing)]
-    rrset_type: String,
-    rrset_values: Vec<String>,
-    rrset_ttl: u32,
+    pub rrset_type: String,
+    pub rrset_values: Vec<String>,
+    pub rrset_ttl: u32,
+}
+
+pub enum State {
+    CreateRecord,
+    DiffRecord,
+}
+
+impl GandiRecord {
+    pub fn diff(&self, record: &Record, values: Vec<String>) -> bool {
+        if self.rrset_ttl == record.ttl && self.rrset_values == values {
+            false
+        } else  {
+            true
+        }
+    }
 }
 
 impl Record {
-    pub fn new(
-        rrset_name: String,
-        rrset_type: String,
-        rrset_ttl: u32,
-        rrset_values: Vec<String>,
-    ) -> Self {
-        for c in rrset_name.chars() {
+    pub fn validate_fields(&self) {
+
+        for c in self.name.chars() {
             if !c.is_ascii_alphanumeric() {
                 panic!("Record name does not match ascii_alphanumeric pattern")
             }
         }
 
-        let rrset_type = rrset_type.to_uppercase();
-
+        let rrset_type = self.rtype.to_uppercase();
         if rrset_type != "AAAA" && rrset_type != "A" {
             panic!("Record type is neither A or AAAA")
         }
 
-        if rrset_ttl > 2_592_000 {
+        if self.ttl > 2_592_000 {
             panic!("TTL size exceed gandis's maximum value (2_592_000)")
         }
-
-        Record {
-            rrset_name,
-            rrset_type,
-            rrset_ttl,
-            rrset_values,
-        }
     }
 
-    pub fn diff(&self, record: &Self) -> RecordState {
-        if self.rrset_values == record.rrset_values {
-            if self.rrset_ttl == record.rrset_ttl {
-                RecordState::Same
-            } else {
-                RecordState::Diff
-            }
-        } else {
-            RecordState::Diff
-        }
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.rrset_name
+    pub fn rtype(&self) -> &str {
+        self.rtype.as_ref()
     }
 
-    pub fn get_type(&self) -> &str {
-        &self.rrset_type
+    pub fn ttl(&self) -> u32 {
+        self.ttl
     }
-
-    pub fn get_values(&self) -> &Vec<String> {
-        &self.rrset_values
-    }
-
-    pub fn get_ttl(&self) -> u32 {
-        self.rrset_ttl
-    }
-}
-
-// impl Default for Record {
-//     fn default() -> Self {
-//         Record {
-//             rrset_name: String::from(""),
-//             rrset_type: String::from(""),
-//             rrset_ttl: 300,
-//             rrset_values: vec![String::from("")],
-//         }
-//     }
-// }
-
-#[derive(Debug)]
-pub enum RecordState {
-    Same,
-    Diff,
 }
