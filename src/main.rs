@@ -1,18 +1,17 @@
-use std::io::{self, Read};
-use std::fs::File;
-use reqwest::{blocking::{Client, Response}, Error, StatusCode};
-use serde_json;
+use reqwest::{
+    blocking::{Client, Response},
+    Error, StatusCode,
+};
+use std::io;
 
 use takina::GandiRecord;
-use toml;
-mod takina;
 mod addr;
+mod takina;
 
 fn main() {
-    
     let read_config_result = match read_config("./takina.toml") {
         Ok(s) => s,
-        Err(e) => panic!("IO Error: Failed to read configuration file {e}")
+        Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
     };
 
     let domains: takina::Config = parse_config(&read_config_result);
@@ -20,9 +19,9 @@ fn main() {
     for domain in &domains.domain {
         for record in domain.record() {
             record.validate_fields()
-        };
-    };
-    
+        }
+    }
+
     let ipv4 = addr::get_ipv4()
         .expect("HTTP API Error: Unable to query for IPv4 addr")
         .text()
@@ -33,10 +32,8 @@ fn main() {
         .text()
         .expect("Parse Error: Unable to get response test");
 
-    
     for domain in &domains.domain {
         for record in domain.record() {
-
             let tmp = String::from("::1");
             let addr;
 
@@ -48,7 +45,8 @@ fn main() {
                 addr = &tmp;
             }
 
-            let gandi_query = match get_record(&domain, &record) {
+            let gandi_network_response = get_record(domain, record);
+            let gandi_api_response = match gandi_network_response {
                 Ok(r) => r,
                 Err(e) => {
                     println!("Network error: Unable to connect to gandi's API");
@@ -57,98 +55,160 @@ fn main() {
                 }
             };
 
-            let gandi_query = match gandi_query.status() {
-                StatusCode::OK => gandi_query,
-                StatusCode::NOT_FOUND => gandi_query,
+            let gandi_api_response = match gandi_api_response.status() {
+                StatusCode::OK => gandi_api_response,
+                StatusCode::NOT_FOUND => gandi_api_response,
                 StatusCode::UNAUTHORIZED => {
-                    println!("API HTTP Error: UNAUTHORIZED Bad authentication");
-                    println!("{}", gandi_query.text().unwrap());
+                    println!(
+                        "API HTTP Error: Bad authentication attempt because of a wrong API Key."
+                    );
+                    println!("{}", gandi_api_response.text().unwrap());
                     break;
                 }
                 StatusCode::FORBIDDEN => {
-                    println!("API HTTP Error: FORBIDDEN Access to the resource is denied");
-                    println!("{}", gandi_query.text().unwrap());
+                    println!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it.");
+                    println!("{}", gandi_api_response.text().unwrap());
                     break;
                 }
                 _ => {
                     println!("API HTTP Error: UNEXPECTED status code see below");
-                    println!("{}", gandi_query.text().unwrap());
+                    println!("{}", gandi_api_response.text().unwrap());
                     continue;
                 }
             };
 
-            let record_state = match gandi_query.status() {
+            let record_state = match gandi_api_response.status() {
                 StatusCode::OK => takina::State::DiffRecord,
                 StatusCode::NOT_FOUND => takina::State::CreateRecord,
                 _ => {
                     println!("API HTTP Error: UNEXPECTED status code see below");
-                    println!("{}", gandi_query.text().unwrap());
+                    println!("{}", gandi_api_response.text().unwrap());
                     continue;
                 }
             };
 
-            let api_state = match record_state {
+            let gandi_network_response = match record_state {
                 takina::State::DiffRecord => {
-    
                     let grecord: GandiRecord = serde_json::from_str(
-                        &gandi_query.text().expect("Reqwest Error: Failed to decode Response")
-                    ).expect("Serde Error: Failed to Deserialze string");
+                        &gandi_api_response
+                            .text()
+                            .expect("Reqwest Error: Failed to decode Response"),
+                    )
+                    .expect("Serde Error: Failed to Deserialze string");
 
-                    if grecord.diff(&record, vec![addr.to_owned()]) {
+                    if grecord.diff(record, vec![addr.to_owned()]) {
                         let grecord = takina::GandiRecord {
                             rrset_values: vec![addr.to_owned()],
                             rrset_ttl: record.ttl(),
                             ..Default::default()
                         };
-                        
-                        println!("Info: Record Updated");
-                        update_record(&domain, &record, &grecord)
-
-                    } else  {
-                        println!("Info: No Update Needed");
+                        let res = update_record(domain, record, &grecord);
+                        println!(
+                            "Info: Record Updated, {}.{} IpAddr: {} TTL: {}",
+                            record.name(),
+                            domain.name(),
+                            addr,
+                            record.ttl(),
+                        );
+                        res
+                    } else {
+                        println!(
+                            "Info: No Update Needed for {}.{} IpAddr: {} TTL: {}",
+                            record.name(),
+                            domain.name(),
+                            addr,
+                            record.ttl(),
+                        );
                         continue;
                     }
-                
-                },
+                }
                 takina::State::CreateRecord => {
                     let grecord = takina::GandiRecord {
                         rrset_values: vec![addr.to_owned()],
                         rrset_ttl: record.ttl(),
                         ..Default::default()
                     };
-                    println!("Info: New Record Created");
-                    create_record(&domain, &record, &grecord)
-                }
-                _ => {
-                    println!("UNEXPECTED Record State");
-                    continue;
+
+                    create_record(domain, record, &grecord)
                 }
             };
 
-            match api_state {
-                Ok(_) => continue,
+            let gandi_api_response = match gandi_network_response {
+                Ok(result) => result,
                 Err(e) => {
-                    println!("API HTTP Error: UNEXPECTED status code see below");
+                    println!("Network error: Unable to connect to gandi's API");
                     println!("{}", e);
                     continue;
                 }
             };
+
+            if record_state == takina::State::DiffRecord {
+                match gandi_api_response.status() {
+                    StatusCode::CREATED => continue,
+                    StatusCode::FORBIDDEN => {
+                        println!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it.");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        continue;
+                    }
+                    StatusCode::UNAUTHORIZED => {
+                        println!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key.");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        break;
+                    }
+                    _ => {
+                        println!("API HTTP Error: UNEXPECTED status code see below");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        continue;
+                    }
+                };
+            } else if record_state == takina::State::CreateRecord {
+                match gandi_api_response.status() {
+                    StatusCode::OK => {
+                        println!("API HTTP Error: OK Record Already Exsist");
+                        println!("This is unexpected since takina must handle this case by itself");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        continue;
+                    }
+                    StatusCode::CREATED => {
+                        println!(
+                            "Info: New Record Created, {}.{} IpAddr: {} TTL: {}",
+                            record.name(),
+                            domain.name(),
+                            addr,
+                            record.ttl(),
+                        );
+                        continue;
+                    }
+                    StatusCode::FORBIDDEN => {
+                        println!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it.");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        continue;
+                    }
+                    StatusCode::CONFLICT => {
+                        println!("API HTTP Error: CONFLICT A record with that name / type pair already exists");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        continue;
+                    }
+                    StatusCode::UNAUTHORIZED => continue,
+                    _ => {
+                        println!("API HTTP Error: Unexpected status code see below");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        continue;
+                    }
+                };
+            }
         }
     }
 }
 
-
 fn read_config(path: &str) -> Result<String, io::Error> {
-    let mut f = File::open(path)?;
-    let mut s = String::new();
-    f.read_to_string(&mut s)?;
-    Ok(s)
+    std::fs::read_to_string(path)
 }
 
-fn parse_config(conf: &String) -> takina::Config {
-    match toml::from_str(&conf) {
+fn parse_config(conf: &str) -> takina::Config {
+    match toml::from_str(conf) {
         Ok(conf) => conf,
-        Err(e) => panic!("Failed to parse toml configuration file {e}")
+        Err(e) => panic!("Failed to parse toml configuration file {e}"),
     }
 }
 
@@ -162,12 +222,16 @@ fn get_record(domain: &takina::Domain, record: &takina::Record) -> Result<Respon
     let client = Client::new();
     let res = client
         .get(endpoint)
-        .header("Authorization", "Apikey ".to_owned() + &domain.api_key())
+        .header("Authorization", "Apikey ".to_owned() + domain.api_key())
         .send()?;
     Ok(res)
 }
 
-fn update_record(domain: &takina::Domain, record: &takina::Record, grecord: &takina::GandiRecord) -> Result<Response, Error> {
+fn update_record(
+    domain: &takina::Domain,
+    record: &takina::Record,
+    grecord: &takina::GandiRecord,
+) -> Result<Response, Error> {
     let endpoint = format!(
         "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
         domain.name(),
@@ -177,13 +241,17 @@ fn update_record(domain: &takina::Domain, record: &takina::Record, grecord: &tak
     let client = reqwest::blocking::Client::new();
     let res = client
         .put(&endpoint)
-        .header("Authorization", "Apikey ".to_owned() + &domain.api_key())
+        .header("Authorization", "Apikey ".to_owned() + domain.api_key())
         .body(serde_json::to_string(&grecord).unwrap())
         .send()?;
     Ok(res)
 }
 
-fn create_record(domain: &takina::Domain, record: &takina::Record, grecord: &takina::GandiRecord) -> Result<Response, Error> {
+fn create_record(
+    domain: &takina::Domain,
+    record: &takina::Record,
+    grecord: &takina::GandiRecord,
+) -> Result<Response, Error> {
     let endpoint = format!(
         "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
         domain.name(),
@@ -193,7 +261,7 @@ fn create_record(domain: &takina::Domain, record: &takina::Record, grecord: &tak
     let client = reqwest::blocking::Client::new();
     let res = client
         .post(&endpoint)
-        .header("Authorization", "Apikey ".to_owned() + &domain.api_key())
+        .header("Authorization", "Apikey ".to_owned() + domain.api_key())
         .body(serde_json::to_string(&grecord).unwrap())
         .send()?;
     Ok(res)

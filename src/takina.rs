@@ -1,15 +1,14 @@
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    pub domain: Vec<Domain>
-
+    pub domain: Vec<Domain>,
 }
 #[derive(Deserialize, Debug)]
 pub struct Domain {
     name: String,
     api_key: String,
-    record: Vec<Record>
+    record: Vec<Record>,
 }
 
 impl Domain {
@@ -31,7 +30,7 @@ pub struct Record {
     name: String,
     #[serde(rename = "type")]
     rtype: String,
-    ttl: u32
+    ttl: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -44,6 +43,7 @@ pub struct GandiRecord {
     pub rrset_ttl: u32,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum State {
     CreateRecord,
     DiffRecord,
@@ -51,30 +51,26 @@ pub enum State {
 
 impl GandiRecord {
     pub fn diff(&self, record: &Record, values: Vec<String>) -> bool {
-        if self.rrset_ttl == record.ttl && self.rrset_values == values {
-            false
-        } else  {
-            true
-        }
+        !(self.rrset_ttl == record.ttl && self.rrset_values == values)
     }
 }
 
 impl Record {
     pub fn validate_fields(&self) {
-
         for c in self.name.chars() {
             if !c.is_ascii_alphanumeric() {
-                panic!("Record name does not match ascii_alphanumeric pattern")
+                panic!(
+                    "Configuration Error: Record name does not match ascii_alphanumeric pattern"
+                );
             }
         }
 
-        let rrset_type = self.rtype.to_uppercase();
-        if rrset_type != "AAAA" && rrset_type != "A" {
-            panic!("Record type is neither A or AAAA")
+        if self.rtype != "AAAA" && self.rtype != "A" {
+            panic!("Configuration Error: Record type is neither A or AAAA")
         }
 
-        if self.ttl > 2_592_000 {
-            panic!("TTL size exceed gandis's maximum value (2_592_000)")
+        if self.ttl > 2_592_000 || self.ttl < 300 {
+            panic!("Configuration Error: TTL size exceed gandis's minimum or maximum value (2_592_000)");
         }
     }
 
