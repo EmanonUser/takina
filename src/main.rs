@@ -2,7 +2,6 @@ use reqwest::{
     blocking::{Client, Response},
     Error, StatusCode,
 };
-use std::io;
 
 use takina::GandiRecord;
 mod addr;
@@ -224,7 +223,7 @@ fn main() {
     }
 }
 
-fn read_config(path: &str) -> Result<String, io::Error> {
+fn read_config(path: &str) -> Result<String, std::io::Error> {
     std::fs::read_to_string(path)
 }
 
