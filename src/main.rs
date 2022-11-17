@@ -211,7 +211,11 @@ fn main() {
                         println!("{}", gandi_api_response.text().unwrap());
                         continue;
                     }
-                    StatusCode::UNAUTHORIZED => continue,
+                    StatusCode::UNAUTHORIZED => {
+                        println!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key.");
+                        println!("{}", gandi_api_response.text().unwrap());
+                        break;
+                    }
                     _ => {
                         println!("API HTTP Error: Unexpected status code see below");
                         println!("{}", gandi_api_response.text().unwrap());
