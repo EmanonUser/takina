@@ -22,27 +22,50 @@ fn main() {
         }
     }
 
-    let ipv4 = addr::get_ipv4()
-        .expect("HTTP API Error: Unable to query for IPv4 addr")
-        .text()
-        .expect("Parse Error: Unable to get response test");
+    let mut disable_ipv4 = false;
+    let ipv4 = match addr::get_ipv4() {
+        Some(r) => r.text().expect("API Error: Unable to parse response test"),
+        None => {
+            disable_ipv4 = true;
+            String::from("127.0.0.1")
+        }
+    };
 
-    let ipv6 = addr::get_ipv6()
-        .expect("HTTP API Error: Unable to query for IPv4 addr")
-        .text()
-        .expect("Parse Error: Unable to get response test");
+    let mut disable_ipv6 = false;
+    let ipv6 = match addr::get_ipv6() {
+        Some(r) => r.text().expect("API Error: Unable to parse response test"),
+        None => {
+            disable_ipv6 = true;
+            String::from("::1")
+        }
+    };
 
     for domain in &domains.domain {
         for record in domain.record() {
-            let tmp = String::from("::1");
             let addr;
 
-            if record.rtype() == "AAAA" {
+            if record.rtype() == "AAAA" && !disable_ipv6 {
                 addr = &ipv6;
-            } else if record.rtype() == "A" {
+            } else if record.rtype() == "AAAA" && disable_ipv6 {
+                println!(
+                    "Info: Skiping {}.{} Type: {}",
+                    record.name(),
+                    domain.name(),
+                    record.rtype(),
+                );
+                continue;
+            } else if record.rtype() == "A" && !disable_ipv4 {
                 addr = &ipv4;
+            } else if record.rtype() == "A" && disable_ipv4 {
+                println!(
+                    "Info: Skiping {}.{} Type: {}",
+                    record.name(),
+                    domain.name(),
+                    record.rtype(),
+                );
+                continue;
             } else {
-                addr = &tmp;
+                panic!("State Error: Unexpected program state");
             }
 
             let gandi_network_response = get_record(domain, record);
