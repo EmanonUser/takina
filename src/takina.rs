@@ -58,7 +58,7 @@ impl GandiRecord {
 impl Record {
     pub fn validate_fields(&self) {
         for c in self.name.chars() {
-            if !c.is_ascii_alphanumeric() {
+            if !c.is_ascii_alphanumeric()  && c != '@' {
                 panic!(
                     "Configuration Error: Record name does not match ascii_alphanumeric pattern"
                 );

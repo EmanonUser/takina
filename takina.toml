@@ -3,7 +3,7 @@ name = "emanon.moe"
 api_key = ""
 
   [[domain.record]]
-    name = "rust"
+    name = "@"
     type = "A"
     ttl = 300
 
