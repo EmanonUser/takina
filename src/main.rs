@@ -19,12 +19,16 @@ fn main() -> ExitCode {
     };
 
     if args.check {
-        let read_config_result = match read_config(&config_path) {
+        let read_config_result = match std::fs::read_to_string(&config_path) {
             Ok(s) => s,
             Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
         };
     
-        let domains: takina::Config = parse_config(&read_config_result);            
+        let domains: takina::Config = match toml::from_str(&read_config_result) {
+            Ok(conf) => conf,
+            Err(e) => panic!("Failed to parse toml configuration file {e}"),
+        };
+        
         for domain in &domains.domain {
             for record in domain.record() {
                 record.validate_fields()
@@ -35,12 +39,15 @@ fn main() -> ExitCode {
     }
 
 
-    let read_config_result = match read_config(&config_path) {
+    let read_config_result = match std::fs::read_to_string(&config_path) {
         Ok(s) => s,
         Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
     };
 
-    let domains: takina::Config = parse_config(&read_config_result);
+    let domains: takina::Config = match toml::from_str(&read_config_result) {
+        Ok(conf) => conf,
+        Err(e) => panic!("Failed to parse toml configuration file {e}"),
+    };
 
     for domain in &domains.domain {
         for record in domain.record() {
@@ -255,9 +262,6 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn read_config(path: &str) -> Result<String, std::io::Error> {
-    std::fs::read_to_string(path)
-}
 
 fn parse_config(conf: &str) -> takina::Config {
     match toml::from_str(conf) {
