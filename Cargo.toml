@@ -17,3 +17,6 @@ strip = true
 opt-level = "s"
 lto = true
 codegen-units = 1
+
+# Debian bullseye binary
+# podman run --rm -v "$PWD":/build -w /build docker.io/rust:1.65-bullseye cargo build --release
