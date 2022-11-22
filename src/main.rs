@@ -1,14 +1,41 @@
+use args::TakinaArgs;
+use clap::Parser;
+use std::process::ExitCode;
 use reqwest::{
     blocking::{Client, Response},
     Error, StatusCode,
 };
 
-use takina::GandiRecord;
-mod addr;
 mod takina;
+mod addr;
+mod args;
 
-fn main() {
-    let read_config_result = match read_config("./takina.toml") {
+fn main() -> ExitCode {
+    let args = TakinaArgs::parse();
+
+    let config_path = match args.config {
+        Some(s) => s,
+        None => "./takina.toml".to_string()
+    };
+
+    if args.check {
+        let read_config_result = match read_config(&config_path) {
+            Ok(s) => s,
+            Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
+        };
+    
+        let domains: takina::Config = parse_config(&read_config_result);            
+        for domain in &domains.domain {
+            for record in domain.record() {
+                record.validate_fields()
+            }
+        }
+        println!("{config_path} configuration file is valid");
+        return ExitCode::SUCCESS;
+    }
+
+
+    let read_config_result = match read_config(&config_path) {
         Ok(s) => s,
         Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
     };
@@ -111,7 +138,7 @@ fn main() {
 
             let gandi_network_response = match record_state {
                 takina::State::DiffRecord => {
-                    let grecord: GandiRecord = serde_json::from_str(
+                    let grecord: takina::GandiRecord = serde_json::from_str(
                         &gandi_api_response
                             .text()
                             .expect("Reqwest Error: Failed to decode Response"),
@@ -225,6 +252,7 @@ fn main() {
             }
         }
     }
+    ExitCode::SUCCESS
 }
 
 fn read_config(path: &str) -> Result<String, std::io::Error> {
