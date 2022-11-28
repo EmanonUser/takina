@@ -2,10 +2,10 @@
 name = "emanon.moe"
 api_key = ""
 
-  [[domain.record]]
-    name = "@"
-    type = "A"
-    ttl = 300
+  # [[domain.record]]
+  #   name = "@"
+  #   type = "A"
+  #   ttl = 1200
 
   [[domain.record]]
     name = "rust"
@@ -13,6 +13,6 @@ api_key = ""
     ttl = 300
 
   [[domain.record]]
-    name = "test"
+    name = "tesvfft"
     type = "AAAA"
     ttl = 300

@@ -1,14 +1,22 @@
 use serde::{Deserialize, Serialize};
+use ureq::{Error, Response};
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub domain: Vec<Domain>,
 }
+
+impl Config {
+    pub fn domain(&self) -> &[Domain] {
+        self.domain.as_ref()
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Domain {
     name: String,
     api_key: String,
-    record: Vec<Record>,
+    pub record: Vec<Record>,
 }
 
 impl Domain {
@@ -23,66 +31,136 @@ impl Domain {
     pub fn record(&self) -> &[Record] {
         self.record.as_ref()
     }
+
+    pub fn validate_fields(&self) {
+        for c in self.name.chars() {
+            if !c.is_ascii_alphanumeric() && c != '.' {
+                panic!(
+                    "Configuration Error: Domain name does not match ascii_alphanumeric pattern"
+                );
+            }
+        }
+
+        if self.api_key.len() < 3 {
+            panic!("Configuration Error: Api Key seems empty");
+        }
+    }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Record {
-    name: String,
-    #[serde(rename = "type")]
-    rtype: String,
-    ttl: u32,
+    #[serde(rename(deserialize = "name"))]
+    rrset_name: String,
+    #[serde(rename(deserialize = "type"))]
+    rrset_type: String,
+    #[serde(skip_deserializing)]
+    rrset_values: Vec<String>,
+    #[serde(rename(deserialize = "ttl"))]
+    rrset_ttl: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct GandiRecord {
-    #[serde(skip_serializing)]
-    pub rrset_name: String,
-    #[serde(skip_serializing)]
-    pub rrset_type: String,
-    pub rrset_values: Vec<String>,
-    pub rrset_ttl: u32,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApiRecord {
+    rrset_name: String,
+    rrset_type: String,
+    rrset_values: Vec<String>,
+    rrset_ttl: u32,
+    rrset_href: String,
 }
 
-#[derive(PartialEq, Eq)]
-pub enum State {
-    CreateRecord,
-    DiffRecord,
-}
-
-impl GandiRecord {
-    pub fn diff(&self, record: &Record, values: Vec<String>) -> bool {
-        !(self.rrset_ttl == record.ttl && self.rrset_values == values)
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        self.rrset_values == other.rrset_values && self.rrset_ttl == other.rrset_ttl
     }
 }
 
 impl Record {
     pub fn validate_fields(&self) {
-        for c in self.name.chars() {
-            if !c.is_ascii_alphanumeric()  && c != '@' {
+        for c in self.rrset_name.chars() {
+            if !c.is_ascii_alphanumeric() && c != '@' {
                 panic!(
                     "Configuration Error: Record name does not match ascii_alphanumeric pattern"
                 );
             }
         }
 
-        if self.rtype != "AAAA" && self.rtype != "A" {
+        if self.rrset_type != "AAAA" && self.rrset_type != "A" {
             panic!("Configuration Error: Record type is neither A or AAAA")
         }
 
-        if self.ttl > 2_592_000 || self.ttl < 300 {
+        if self.rrset_ttl > 2_592_000 || self.rrset_ttl < 300 {
             panic!("Configuration Error: TTL size exceed gandis's minimum or maximum value (2_592_000)");
         }
     }
 
     pub fn name(&self) -> &str {
-        self.name.as_ref()
+        self.rrset_name.as_ref()
     }
 
     pub fn rtype(&self) -> &str {
-        self.rtype.as_ref()
+        self.rrset_type.as_ref()
+    }
+
+    pub fn set_rrset_values(&mut self, rrset_values: Vec<String>) {
+        self.rrset_values = rrset_values;
     }
 
     pub fn ttl(&self) -> u32 {
-        self.ttl
+        self.rrset_ttl
     }
+
+    pub fn from_api_record(apirecord: ApiRecord) -> Self {
+        Record {
+            rrset_name: apirecord.rrset_name,
+            rrset_type: apirecord.rrset_type,
+            rrset_values: apirecord.rrset_values,
+            rrset_ttl: apirecord.rrset_ttl,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq)]
+pub enum TakinaState {
+    CreateRecord,
+    DiffRecord,
+}
+
+pub fn get_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
+    let endpoint = format!(
+        "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
+        domain.name(),
+        record.name(),
+        record.rtype()
+    );
+    let key = format!("{} {}", "ApiKey", domain.api_key());
+    let res = ureq::get(&endpoint).set("Authorization", &key).call()?;
+    Ok(res)
+}
+
+pub fn update_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
+    let endpoint = format!(
+        "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
+        domain.name(),
+        record.name(),
+        record.rtype()
+    );
+    let key = format!("{} {}", "ApiKey", domain.api_key());
+    let res = ureq::put(&endpoint)
+        .set("Authorization", &key)
+        .send_string(&serde_json::to_string(&record).unwrap())?;
+    Ok(res)
+}
+
+pub fn create_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
+    let endpoint = format!(
+        "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
+        domain.name(),
+        record.name(),
+        record.rtype()
+    );
+    let key = format!("{} {}", "ApiKey", domain.api_key());
+    let res = ureq::post(&endpoint)
+        .set("Authorization", &key)
+        .send_string(&serde_json::to_string(&record).unwrap())?;
+    Ok(res)
 }

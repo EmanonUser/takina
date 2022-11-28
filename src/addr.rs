@@ -1,10 +1,8 @@
-use reqwest::blocking::{Client, Response};
+use ureq::Response;
 
 pub fn get_ipv4() -> Option<Response> {
     let endpoint = "https://api4.ipify.org?format=txt";
-    let client = Client::new();
-
-    let res = client.get(endpoint).send();
+    let res = ureq::get(endpoint).call();
 
     match res {
         Ok(r) => Some(r),
@@ -18,9 +16,7 @@ pub fn get_ipv4() -> Option<Response> {
 
 pub fn get_ipv6() -> Option<Response> {
     let endpoint = "https://api6.ipify.org?format=txt";
-    let client = Client::new();
-
-    let res = client.get(endpoint).send();
+    let res = ureq::get(endpoint).call();
 
     match res {
         Ok(r) => Some(r),
