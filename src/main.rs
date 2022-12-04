@@ -8,7 +8,6 @@ use takina::{ApiRecord, Record, TakinaState};
 
 mod addr;
 mod args;
-mod takina;
 
 fn main() -> ExitCode {
     let args = TakinaArgs::parse();
