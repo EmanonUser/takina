@@ -114,7 +114,7 @@ fn main() -> ExitCode {
 
             let res = match get_record(domain, record) {
                 Ok(r) => r,
-                Err(e) => match e {
+                Err(e) => match *e {
                     Error::Status(404, r) => r,
                     Error::Status(401, _) => {
                         println!(
@@ -212,7 +212,7 @@ fn main() -> ExitCode {
                                 code => println!("Ureq Error: Unexpected response code: {code}"),
                             };
                         }
-                        Err(e) => match e {
+                        Err(e) => match *e {
                             Error::Status(401, r) => {
                                 println!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key.");
                                 println!("{}", r.into_string().unwrap());
@@ -257,7 +257,7 @@ fn main() -> ExitCode {
                                 code => println!("Ureq Error: Unexpected response code: {code}"),
                             };
                         }
-                        Err(e) => match e {
+                        Err(e) => match *e {
                             Error::Status(401, r) => {
                                 println!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key.");
                                 println!("{}", r.into_string().unwrap());

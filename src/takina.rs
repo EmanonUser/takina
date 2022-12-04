@@ -125,7 +125,7 @@ pub enum TakinaState {
     DiffRecord,
 }
 
-pub fn get_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
+pub fn get_record(domain: &Domain, record: &Record) -> Result<Response, Box<Error>> {
     let endpoint = format!(
         "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
         domain.name(),
@@ -137,7 +137,7 @@ pub fn get_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
     Ok(res)
 }
 
-pub fn update_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
+pub fn update_record(domain: &Domain, record: &Record) -> Result<Response, Box<Error>> {
     let endpoint = format!(
         "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
         domain.name(),
@@ -151,7 +151,7 @@ pub fn update_record(domain: &Domain, record: &Record) -> Result<Response, Error
     Ok(res)
 }
 
-pub fn create_record(domain: &Domain, record: &Record) -> Result<Response, Error> {
+pub fn create_record(domain: &Domain, record: &Record) -> Result<Response, Box<Error>> {
     let endpoint = format!(
         "https://api.gandi.net/v5/livedns/domains/{}/records/{}/{}",
         domain.name(),
