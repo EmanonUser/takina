@@ -92,14 +92,7 @@ fn main() -> ExitCode {
     for domain in domains.domain() {
         for record in domain.record() {
             let mut addr = String::default();
-            if record.rtype() == "A" && disable_ipv4 {
-                println!(
-                    "Info: Skiping Record {}.{} Type: {}",
-                    record.name(),
-                    domain.name(),
-                    record.rtype(),
-                );
-            } else if record.rtype() == "AAAA" && disable_ipv6 {
+            if record.rtype() == "A" && disable_ipv4 || record.rtype() == "AAAA" && disable_ipv6 {
                 println!(
                     "Info: Skiping Record {}.{} Type: {}",
                     record.name(),
