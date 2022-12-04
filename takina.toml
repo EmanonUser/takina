@@ -1,18 +1,13 @@
 [[domain]]
-name = "emanon.moe"
+name = ""
 api_key = ""
 
-  # [[domain.record]]
-  #   name = "@"
-  #   type = "A"
-  #   ttl = 1200
+  [[domain.record]]
+    name = "@" # the domain itself
+    type = "A"
+    ttl = 1200
 
   [[domain.record]]
-    name = "rust"
+    name = "rust"  # subdomain
     type = "AAAA"
-    ttl = 300
-
-  [[domain.record]]
-    name = "tesvfft"
-    type = "AAAA"
-    ttl = 300
+    ttl = 1200
