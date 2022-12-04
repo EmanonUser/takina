@@ -3,10 +3,9 @@ use std::process::ExitCode;
 use ureq::Error;
 
 use args::TakinaArgs;
-use takina::{create_record, get_record, update_record};
+use takina::{create_record, get_ipv4, get_ipv6, get_record, update_record};
 use takina::{ApiRecord, Record, TakinaState};
 
-mod addr;
 mod args;
 
 fn main() -> ExitCode {
@@ -68,7 +67,7 @@ fn main() -> ExitCode {
         }
     }
 
-    let ipv4 = match addr::get_ipv4() {
+    let ipv4 = match get_ipv4() {
         Some(res) => res
             .into_string()
             .expect("Error: Failed to parse ipify response to string"),
@@ -78,7 +77,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let ipv6 = match addr::get_ipv6() {
+    let ipv6 = match get_ipv6() {
         Some(res) => res
             .into_string()
             .expect("Error: Failed to parse ipify response to string"),
