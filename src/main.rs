@@ -175,7 +175,7 @@ fn main() -> ExitCode {
                         update_record(domain, &config_record)
                     } else {
                         info!(
-                            "No Update Needed for {}.{} IpAddr: {} TTL: {}",
+                            "No update Needed for {}.{} IpAddr: {} TTL: {}",
                             record.name(),
                             domain.name(),
                             addr,
