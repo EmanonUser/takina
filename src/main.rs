@@ -1,7 +1,8 @@
 use clap::Parser;
 use std::process::ExitCode;
 use ureq::Error;
-
+use log::{info, warn, error};
+use env_logger::Env;
 use args::TakinaArgs;
 use takina::{create_record, get_ipv4, get_ipv6, get_record, update_record};
 use takina::{ApiRecord, Record, TakinaState};
@@ -9,6 +10,7 @@ use takina::{ApiRecord, Record, TakinaState};
 mod args;
 
 fn main() -> ExitCode {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let args = TakinaArgs::parse();
 
     let config_path = match args.config {
@@ -19,12 +21,18 @@ fn main() -> ExitCode {
     if args.check {
         let read_config_result = match std::fs::read_to_string(&config_path) {
             Ok(s) => s,
-            Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
+            Err(e) => {
+                error!("IO Error: Failed to read configuration file {e}");
+                return ExitCode::FAILURE
+            }
         };
 
         let domains: takina::Config = match toml::from_str(&read_config_result) {
             Ok(conf) => conf,
-            Err(e) => panic!("Failed to parse toml configuration file {e}"),
+            Err(e) => {
+                error!("Configuration Error: Failed to parse toml configuration file {e}");
+                return ExitCode::FAILURE;
+            }
         };
 
         for domain in &domains.domain {
@@ -33,18 +41,24 @@ fn main() -> ExitCode {
                 record.validate_fields();
             }
         }
-        println!("{config_path} configuration file is valid");
+        info!("{config_path} configuration file is valid");
         return ExitCode::SUCCESS;
     }
 
     let read_config_result = match std::fs::read_to_string(&config_path) {
         Ok(s) => s,
-        Err(e) => panic!("IO Error: Failed to read configuration file {e}"),
+        Err(e) => {
+            error!("IO Error: Failed to read configuration file {e}");
+            return ExitCode::FAILURE
+        }
     };
 
     let domains: takina::Config = match toml::from_str(&read_config_result) {
         Ok(conf) => conf,
-        Err(e) => panic!("Failed to parse toml configuration file {e}"),
+        Err(e) => {
+            error!("Configuration Error: Failed to parse toml configuration file {e}");
+            return ExitCode::FAILURE;
+        }
     };
 
     for domain in domains.domain() {
@@ -91,8 +105,8 @@ fn main() -> ExitCode {
         for record in domain.record() {
             let mut addr = String::default();
             if record.rtype() == "A" && disable_ipv4 || record.rtype() == "AAAA" && disable_ipv6 {
-                println!(
-                    "Info: Skiping Record {}.{} Type: {}",
+                warn!(
+                    "Skiping Record {}.{} Type: {}",
                     record.name(),
                     domain.name(),
                     record.rtype(),
@@ -108,26 +122,22 @@ fn main() -> ExitCode {
                 Err(e) => match *e {
                     Error::Status(404, r) => r,
                     Error::Status(401, _) => {
-                        println!(
-                        "API HTTP Error: Bad authentication attempt because of a wrong API Key.");
-                        println!("{}", e);
+                        error!(
+                        "API HTTP Error: Bad authentication attempt because of a wrong API Key {e}");
                         break;
                     }
                     Error::Status(403, _) => {
-                        println!(
-                        "API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it.");
-                        println!("{}", e);
+                        error!(
+                        "API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it {e}");
                         break;
                     }
                     Error::Status(code, res) => {
-                        println!("API HTTP Error: UNEXPECTED status code see below");
-                        println!("{}", code);
-                        println!("{}", res.into_string().unwrap());
+                        error!("API HTTP Error: UNEXPECTED status code: {code}");
+                        error!("{}", res.into_string().unwrap());
                         continue;
                     }
                     Error::Transport(t) => {
-                        println!("Transport Error: see status code see below");
-                        println!("{}", t);
+                        error!("Transport Error: {t}");
                         continue;
                     }
                 },
@@ -137,8 +147,7 @@ fn main() -> ExitCode {
                 200 => TakinaState::DiffRecord,
                 404 => TakinaState::CreateRecord,
                 _ => {
-                    println!("API HTTP Error: UNEXPECTED status code see below");
-                    println!("{}", res.into_string().unwrap());
+                    error!("API HTTP Error: UNEXPECTED status code: {}", res.into_string().unwrap());
                     continue;
                 }
             };
@@ -164,8 +173,8 @@ fn main() -> ExitCode {
                     if config_record != api_record {
                         update_record(domain, &config_record)
                     } else {
-                        println!(
-                            "Info: No Update Needed for {}.{} IpAddr: {} TTL: {}",
+                        info!(
+                            "No Update Needed for {}.{} IpAddr: {} TTL: {}",
                             record.name(),
                             domain.name(),
                             addr,
@@ -182,8 +191,8 @@ fn main() -> ExitCode {
                         Ok(r) => {
                             match r.status() {
                                 200 => {
-                                    println!(
-                                        "Info: Record already exist {}.{} IpAddr: {} TTL: {}",
+                                    info!(
+                                        "Record already exist {}.{} IpAddr: {} TTL: {}",
                                         record.name(),
                                         domain.name(),
                                         addr,
@@ -191,8 +200,8 @@ fn main() -> ExitCode {
                                     );
                                 }
                                 201 => {
-                                    println!(
-                                        "Info: Record created, {}.{} IpAddr: {} TTL: {}",
+                                    info!(
+                                        "Record created, {}.{} IpAddr: {} TTL: {}",
                                         record.name(),
                                         domain.name(),
                                         addr,
@@ -200,33 +209,31 @@ fn main() -> ExitCode {
                                     );
                                 }
 
-                                code => println!("Ureq Error: Unexpected response code: {code}"),
+                                code => error!("Ureq Error: Unexpected response code: {code}"),
                             };
                         }
                         Err(e) => match *e {
                             Error::Status(401, r) => {
-                                println!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key.");
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key");
+                                error!("{}", r.into_string().unwrap());
                                 break;
                             }
                             Error::Status(403, r) => {
-                                println!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it.");
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it");
+                                error!("{}", r.into_string().unwrap());
                             }
                             Error::Status(409, r) => {
-                                println!("API HTTP Error: CONFLICT A record with that name / type pair already exists");
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: CONFLICT A record with that name / type pair already exists");
+                                error!("{}", r.into_string().unwrap());
                                 continue;
                             }
                             Error::Status(code, r) => {
-                                println!("API HTTP Error: UNEXPECTED status code see below");
-                                println!("{}", code);
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: UNEXPECTED status code: {code}");
+                                error!("{}", r.into_string().unwrap());
                                 continue;
                             }
                             Error::Transport(t) => {
-                                println!("Transport Error: see below");
-                                println!("{}", t);
+                                error!("Transport Error: {t}");
                                 continue;
                             }
                         },
@@ -237,34 +244,33 @@ fn main() -> ExitCode {
                         Ok(r) => {
                             match r.status() {
                                 201 => {
-                                    println!(
-                                        "Info: Record Updated, {}.{} IpAddr: {} TTL: {}",
+                                    info!(
+                                        "Record updated, {}.{} IpAddr: {} TTL: {}",
                                         record.name(),
                                         domain.name(),
                                         addr,
                                         record.ttl()
                                     );
                                 }
-                                code => println!("Ureq Error: Unexpected response code: {code}"),
+                                code => error!("Ureq Error: Unexpected response code: {code}"),
                             };
                         }
                         Err(e) => match *e {
                             Error::Status(401, r) => {
-                                println!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key.");
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key");
+                                error!("{}", r.into_string().unwrap());
                             }
                             Error::Status(403, r) => {
-                                println!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it.");
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it");
+                                error!("{}", r.into_string().unwrap());
                             }
                             Error::Status(code, r) => {
-                                println!("API HTTP Error: UNEXPECTED status code see below");
-                                println!("{}", code);
-                                println!("{}", r.into_string().unwrap());
+                                error!("API HTTP Error: UNEXPECTED status code see below");
+                                error!("{}", code);
+                                error!("{}", r.into_string().unwrap());
                             }
                             Error::Transport(t) => {
-                                println!("Transport Error: see below");
-                                println!("{}", t);
+                                error!("Transport Error: {t}");
                             }
                         },
                     };

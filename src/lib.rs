@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use ureq::{Error, Response};
-
+use log::{warn, error};
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub domain: Vec<Domain>,
@@ -35,14 +35,14 @@ impl Domain {
     pub fn validate_fields(&self) {
         for c in self.name.chars() {
             if !c.is_ascii_alphanumeric() && c != '.' {
-                panic!(
+                error!(
                     "Configuration Error: Domain name does not match ascii_alphanumeric pattern"
                 );
             }
         }
 
         if self.api_key.len() < 3 {
-            panic!("Configuration Error: Api Key seems empty");
+            error!("Configuration Error: api Key seems empty");
         }
     }
 }
@@ -78,18 +78,18 @@ impl Record {
     pub fn validate_fields(&self) {
         for c in self.rrset_name.chars() {
             if !c.is_ascii_alphanumeric() && c != '@' {
-                panic!(
+                error!(
                     "Configuration Error: Record name does not match ascii_alphanumeric pattern"
                 );
             }
         }
 
         if self.rrset_type != "AAAA" && self.rrset_type != "A" {
-            panic!("Configuration Error: Record type is neither A or AAAA")
+            error!("Configuration Error: Record type is neither A or AAAA")
         }
 
         if self.rrset_ttl > 2_592_000 || self.rrset_ttl < 300 {
-            panic!("Configuration Error: TTL size exceed gandis's minimum or maximum value (2_592_000)");
+            error!("Configuration Error: TTL size exceed gandis's minimum or maximum value (2_592_000)");
         }
     }
 
@@ -172,8 +172,7 @@ pub fn get_ipv4() -> Option<Response> {
     match res {
         Ok(r) => Some(r),
         Err(e) => {
-            println!("Network error: Failed to fetch IPv4 addr");
-            println!("{e}");
+            warn!("Network Error: Failed to fetch IPv4 addr {e}");
             None
         }
     }
@@ -186,8 +185,7 @@ pub fn get_ipv6() -> Option<Response> {
     match res {
         Ok(r) => Some(r),
         Err(e) => {
-            println!("Network error: Failed to fetch IPv6 addr");
-            println!("{e}");
+            warn!("Network Error: Failed to fetch IPv6 addr {e}");
             None
         }
     }
