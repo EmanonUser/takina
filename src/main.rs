@@ -106,7 +106,7 @@ fn main() -> ExitCode {
             let mut addr = String::default();
             if record.rtype() == "A" && disable_ipv4 || record.rtype() == "AAAA" && disable_ipv6 {
                 warn!(
-                    "Skiping Record {}.{} Type: {}",
+                    "Skipping record {}.{} type: {}",
                     record.name(),
                     domain.name(),
                     record.rtype(),
@@ -175,7 +175,7 @@ fn main() -> ExitCode {
                         update_record(domain, &config_record)
                     } else {
                         info!(
-                            "No update Needed for {}.{} IpAddr: {} TTL: {}",
+                            "No update needed for {}.{} IpAddr: {} TTL: {}",
                             record.name(),
                             domain.name(),
                             addr,
