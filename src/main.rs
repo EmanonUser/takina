@@ -111,6 +111,7 @@ fn main() -> ExitCode {
                     domain.name(),
                     record.rtype(),
                 );
+                continue;
             } else if record.rtype() == "A" && !disable_ipv4 {
                 addr = ipv4.to_owned();
             } else if record.rtype() == "AAAA" && !disable_ipv6 {
@@ -221,6 +222,7 @@ fn main() -> ExitCode {
                             Error::Status(403, r) => {
                                 error!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it");
                                 error!("{}", r.into_string().unwrap());
+                                break;
                             }
                             Error::Status(409, r) => {
                                 error!("API HTTP Error: CONFLICT A record with that name / type pair already exists");
@@ -259,18 +261,21 @@ fn main() -> ExitCode {
                             Error::Status(401, r) => {
                                 error!("API HTTP Error: UNAUTHORIZED Bad authentication attempt because of a wrong API Key");
                                 error!("{}", r.into_string().unwrap());
+                                break;
                             }
                             Error::Status(403, r) => {
                                 error!("API HTTP Error: FORBIDDEN Access to the resource is denied. Mainly due to a lack of permissions to access it");
                                 error!("{}", r.into_string().unwrap());
+                                break;
                             }
                             Error::Status(code, r) => {
-                                error!("API HTTP Error: UNEXPECTED status code see below");
-                                error!("{}", code);
+                                error!("API HTTP Error: UNEXPECTED status code: {code}");
                                 error!("{}", r.into_string().unwrap());
+                                continue;
                             }
                             Error::Transport(t) => {
                                 error!("Transport Error: {t}");
+                                continue;
                             }
                         },
                     };
