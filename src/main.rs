@@ -1,11 +1,11 @@
-use clap::Parser;
-use std::process::ExitCode;
-use ureq::Error;
-use log::{info, warn, error};
-use env_logger::Env;
 use args::TakinaArgs;
+use clap::Parser;
+use env_logger::Env;
+use log::{error, info, warn};
+use std::process::ExitCode;
 use takina::{create_record, get_ipv4, get_ipv6, get_record, update_record};
 use takina::{ApiRecord, Record, TakinaState};
+use ureq::Error;
 
 mod args;
 
@@ -23,7 +23,7 @@ fn main() -> ExitCode {
             Ok(s) => s,
             Err(e) => {
                 error!("IO Error: Failed to read configuration file {e}");
-                return ExitCode::FAILURE
+                return ExitCode::FAILURE;
             }
         };
 
@@ -49,7 +49,7 @@ fn main() -> ExitCode {
         Ok(s) => s,
         Err(e) => {
             error!("IO Error: Failed to read configuration file {e}");
-            return ExitCode::FAILURE
+            return ExitCode::FAILURE;
         }
     };
 
@@ -148,7 +148,10 @@ fn main() -> ExitCode {
                 200 => TakinaState::DiffRecord,
                 404 => TakinaState::CreateRecord,
                 _ => {
-                    error!("API HTTP Error: UNEXPECTED status code: {}", res.into_string().unwrap());
+                    error!(
+                        "API HTTP Error: UNEXPECTED status code: {}",
+                        res.into_string().unwrap()
+                    );
                     continue;
                 }
             };

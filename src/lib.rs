@@ -1,6 +1,7 @@
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
 use ureq::{Error, Response};
-use log::{warn, error};
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub domain: Vec<Domain>,
